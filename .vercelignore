@@ -1,0 +1,17 @@
+# 배포(사이트)에 올리지 않는 것
+# 저장소에만 올리는 것
+CLAUDE.md
+README.md
+
+# 어디에도 올리지 않는 것
+tools/
+진단/
+.claude/
+*_정리본.xlsx
+*_바꾼기록.xlsx
+~$*
+
+# 저장소 설정 파일
+.gitignore
+.vercelignore
+.vercel/

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- 이 화면은 같은 폴더의 파일만 읽는다. 다른 곳으로 연결하거나 보내는 것을 브라우저가 막는다. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>출장비 정리기</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>출장비 정리기</h1>
+    <p class="privacy">넣은 파일은 이 컴퓨터의 브라우저 안에서만 처리합니다. 어디로도 보내지 않습니다.</p>
+  </header>
+
+  <main>
+    <!-- 1. 파일 넣기 -->
+    <section class="card" id="step-file">
+      <h2><span class="num">1</span> 엑셀 파일 넣기</h2>
+      <label class="drop" id="drop">
+        <input type="file" id="file-input" accept=".xlsx,.xls,.xlsm">
+        <span class="drop-main">엑셀 파일을 여기에 끌어다 놓으세요</span>
+        <span class="drop-sub">또는 눌러서 고르기 (.xlsx)</span>
+      </label>
+      <div id="file-info" class="info" hidden></div>
+    </section>
+
+    <!-- 2. 처방 -->
+    <section class="card" id="step-rules" hidden>
+      <h2><span class="num">2</span> 처방</h2>
+      <div id="rules-missing" class="notice warn" hidden>
+        <p><strong>이 파일에 맞는 처방이 없습니다.</strong></p>
+        <p id="rules-missing-detail" class="small"></p>
+        <label class="button secondary">
+          처방 파일(.json) 고르기
+          <input type="file" id="rules-input" accept=".json,application/json" hidden>
+        </label>
+      </div>
+      <div id="rules-errors" class="notice error" hidden></div>
+      <div id="rules-view" hidden>
+        <p id="rules-meta" class="small"></p>
+        <ol id="rules-list" class="rules"></ol>
+        <button type="button" id="run" class="button primary">규칙대로 정리</button>
+      </div>
+    </section>
+
+    <!-- 3. 결과 -->
+    <section class="card" id="step-result" hidden>
+      <h2><span class="num">3</span> 정리 결과</h2>
+      <div id="run-error" class="notice error" hidden></div>
+      <div id="result-view" hidden>
+        <div class="stats" id="stats"></div>
+        <div id="idem" class="notice"></div>
+        <div class="downloads">
+          <button type="button" id="dl-clean" class="button primary">정리본 내려받기</button>
+          <button type="button" id="dl-log" class="button secondary">바꾼 기록 내려받기</button>
+        </div>
+        <details open>
+          <summary>표시한 행 <span id="count-flagged"></span></summary>
+          <div class="table-wrap"><table id="tbl-flagged"></table></div>
+        </details>
+        <details>
+          <summary>고친 값 <span id="count-changes"></span></summary>
+          <div class="table-wrap"><table id="tbl-changes"></table></div>
+        </details>
+        <details>
+          <summary>지운 행 <span id="count-removed"></span></summary>
+          <div class="table-wrap"><table id="tbl-removed"></table></div>
+        </details>
+        <details id="warn-box" hidden>
+          <summary>처방대로 바꾸지 못해 그대로 둔 값 <span id="count-warnings"></span></summary>
+          <div class="table-wrap"><table id="tbl-warnings"></table></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- 4. 정답과 대조 -->
+    <section class="card" id="step-answer" hidden>
+      <h2><span class="num">4</span> 정답과 대조</h2>
+      <p class="small">정답 파일은 이 컴퓨터에서 고릅니다. 사이트에는 정답 파일을 두지 않습니다.</p>
+      <label class="button secondary">
+        정답 파일 고르기 (.xlsx · .csv)
+        <input type="file" id="answer-input" accept=".xlsx,.xls,.xlsm,.csv" hidden>
+      </label>
+      <div id="answer-error" class="notice error" hidden></div>
+      <div id="answer-view" hidden>
+        <div class="stats" id="answer-stats"></div>
+        <p id="answer-notes" class="small"></p>
+        <details open>
+          <summary>어긋난 칸 <span id="count-mismatch"></span></summary>
+          <div class="table-wrap"><table id="tbl-mismatch"></table></div>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p id="rules-status" class="small"></p>
+  </footer>
+
+  <script src="lib/xlsx.full.min.js"></script>
+  <script src="clean.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
