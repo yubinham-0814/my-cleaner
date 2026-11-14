@@ -54,9 +54,10 @@
       .then(function (sets) {
         state.ruleSets = sets.filter(function (s) { return s.rules; });
         var bad = sets.filter(function (s) { return s.error; });
-        $('rules-status').textContent = '처방 파일 ' + state.ruleSets.length + '개를 읽었습니다: ' +
-          state.ruleSets.map(function (s) { return s.name; }).join(', ') +
-          (bad.length ? ' · 읽지 못한 파일: ' + bad.map(function (s) { return s.name; }).join(', ') : '');
+        // 잘 읽었으면 아무것도 띄우지 않는다. (엑셀을 넣기 전에 «읽었습니다»가 보이면 헷갈린다)
+        $('rules-status').textContent = bad.length
+          ? '처방 파일 중 읽지 못한 것이 있습니다: ' + bad.map(function (s) { return s.name; }).join(', ')
+          : '';
       })
       .catch(function (e) {
         state.ruleIndexError = '처방 목록(rules/index.json)을 읽지 못했습니다: ' + (e.message || e);
