@@ -1,14 +1,16 @@
 /* app.js — 화면
  *
  * 파일 넣기 → 줄 수 · 칸 수 → 처방 보여 주기 → 규칙대로 정리 → 결과 · 내려받기 → 정답과 대조
- * 파일 내용은 이 브라우저 밖으로 나가지 않는다. 이 파일이 서버에 요청하는 것은
- * 화면을 열 때 같은 폴더의 처방 파일(rules/)을 읽는 것뿐이다.
+ * 파일 내용은 이 브라우저 밖으로 나가지 않는다. 이 파일이 서버에 요청하는 것은 둘뿐이다.
+ *   1. 화면을 열 때 처방 목록 rules/index.json
+ *   2. 엑셀을 넣었을 때, 그 이름이 처방 목록에 있으면 그 처방 파일 rules/<이름>.json 하나
+ *      (목록에 없는 이름이면 아무것도 요청하지 않는다)
  */
 (function () {
   'use strict';
 
   var C = window.Cleaner;
-  var state = { ruleSets: [], ruleIndexError: null, file: null, wb: null, rulesSet: null, table: null, result: null, idem: null };
+  var state = { ruleIndex: [], ruleIndexError: null, file: null, wb: null, rulesSet: null, table: null, result: null, idem: null };
 
   function $(id) { return document.getElementById(id); }
 
@@ -33,7 +35,7 @@
   }
 
   // ------------------------------------------------------------ 처방 목록 읽기
-  // 화면을 열 때 한 번만 읽는다. 사용자가 넣은 파일 이름이나 내용은 요청에 담지 않는다.
+  // 화면을 열 때 처방 목록(이름들)만 읽는다. 처방 파일 자체는 엑셀을 넣었을 때 읽는다.
   function loadRuleIndex() {
     if (!window.fetch || location.protocol === 'file:') {
       state.ruleIndexError = '이 화면을 파일로 직접 열어서 처방 목록을 읽지 못했습니다. 엑셀을 넣은 뒤 처방 파일을 직접 골라 주세요.';
@@ -43,21 +45,9 @@
     return fetch('rules/index.json', { cache: 'no-store' })
       .then(function (r) { if (!r.ok) throw new Error('rules/index.json ' + r.status); return r.json(); })
       .then(function (idx) {
-        var files = (idx && idx.files) || [];
-        return Promise.all(files.map(function (name) {
-          return fetch('rules/' + encodeURIComponent(name), { cache: 'no-store' })
-            .then(function (r) { if (!r.ok) throw new Error(name + ' ' + r.status); return r.json(); })
-            .then(function (rules) { return { name: name, rules: rules, source: 'rules/' + name }; })
-            .catch(function (e) { return { name: name, error: String(e.message || e) }; });
-        }));
-      })
-      .then(function (sets) {
-        state.ruleSets = sets.filter(function (s) { return s.rules; });
-        var bad = sets.filter(function (s) { return s.error; });
+        state.ruleIndex = ((idx && idx.files) || []).map(function (name) { return { name: name }; });
         // 잘 읽었으면 아무것도 띄우지 않는다. (엑셀을 넣기 전에 «읽었습니다»가 보이면 헷갈린다)
-        $('rules-status').textContent = bad.length
-          ? '처방 파일 중 읽지 못한 것이 있습니다: ' + bad.map(function (s) { return s.name; }).join(', ')
-          : '';
+        $('rules-status').textContent = '';
       })
       .catch(function (e) {
         state.ruleIndexError = '처방 목록(rules/index.json)을 읽지 못했습니다: ' + (e.message || e);
@@ -65,6 +55,23 @@
       });
   }
   var ruleIndexReady = loadRuleIndex();
+
+  // 엑셀 이름이 처방 목록에 있을 때만 그 처방 파일 하나를 요청한다.
+  // 목록에 없는 이름이면 아무것도 요청하지 않으므로, 넣은 파일 이름이 밖으로 나가지 않는다.
+  function findAndLoadRules(file) {
+    if (state.file !== file) return;
+    showBox('step-rules', true);
+    var found = C.findRules(file.name, state.ruleIndex);
+    if (!found) { showRulesMissing(); return; }
+    return fetch('rules/' + encodeURIComponent(found.name), { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (rules) {
+        if (state.file === file) useRules({ name: found.name, rules: rules, source: 'rules/' + found.name });
+      })
+      .catch(function (e) {
+        if (state.file === file) showRulesMissing('처방 파일 rules/' + found.name + '을 읽지 못했습니다 (' + (e.message || e) + ').');
+      });
+  }
 
   // ------------------------------------------------------------ 1. 파일 넣기
 
@@ -85,17 +92,13 @@
     file.arrayBuffer().then(function (buf) {
       state.wb = C.workbookFrom(new Uint8Array(buf));
       renderFileInfo();
-      return ruleIndexReady;
-    }).then(function () {
-      if (!state.wb) return;
-      var found = C.findRules(file.name, state.ruleSets);
-      showBox('step-rules', true);
-      if (found) useRules(found);
-      else showRulesMissing();
     }).catch(function (err) {
       clear(info);
       info.appendChild(el('div', { class: 'notice error', text: '엑셀 파일로 읽지 못했습니다. (' + (err.message || err) + ')' }));
       state.wb = null;
+    }).then(function () {
+      if (!state.wb || state.file !== file) return;
+      return ruleIndexReady.then(function () { return findAndLoadRules(file); });
     });
   }
 
@@ -137,10 +140,10 @@
 
   // ------------------------------------------------------------ 2. 처방
 
-  function showRulesMissing() {
+  function showRulesMissing(reason) {
     showBox('rules-missing', true);
     showBox('rules-view', false);
-    var d = '찾은 이름: rules/' + C.baseName(state.file.name) + '.json';
+    var d = reason || ('찾은 이름: rules/' + C.baseName(state.file.name) + '.json');
     if (state.ruleIndexError) d += ' · ' + state.ruleIndexError;
     $('rules-missing-detail').textContent = d + ' · 처방 파일을 직접 골라 올릴 수 있습니다.';
   }
